@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "whatsapp": {
+      "command": "node",
+      "args": ["/home/user/studio/whatsapp-mcp/server-real.js"],
+      "env": {}
+    }
+  }
+}

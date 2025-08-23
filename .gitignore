@@ -1,0 +1,19 @@
+# Session files
+whatsapp-session*/
+.wwebjs_cache/
+
+# Temporary files
+tmp/
+user_id
+
+# Credentials and sensitive files
+oauth_creds.json
+gemini-local/.gcloud/
+GEMINI.md
+
+# IDE specific
+.idx/
+
+# Cache directories
+node_modules/
+*.log

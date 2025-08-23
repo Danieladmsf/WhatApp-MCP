@@ -1,0 +1,25 @@
+{
+  "name": "whatsapp-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP Server para integração WhatsApp com Claude Code",
+  "main": "server-real.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server-real.js",
+    "dev": "node --inspect server-real.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.32.0"
+  },
+  "keywords": [
+    "mcp",
+    "whatsapp",
+    "claude",
+    "automation"
+  ],
+  "author": "Claude Code User",
+  "license": "MIT"
+}
