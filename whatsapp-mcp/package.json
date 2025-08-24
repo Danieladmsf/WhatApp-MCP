@@ -5,13 +5,12 @@
   "main": "api-server.js",
   "type": "module",
   "scripts": {
-    "start": "rm -rf whatsapp-session && node api-server.js",
+    "start": "node api-server.js",
     "dev": "rm -rf whatsapp-session && node --inspect api-server.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "express": "^4.18.2",
-    "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
     "whatsapp-web.js": "^1.32.0"
   },

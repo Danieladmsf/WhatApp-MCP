@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 
-import express from 'express';
 import pkg from 'whatsapp-web.js';
 import qrcodeTerminal from 'qrcode-terminal';
+import { promises as fs } from 'fs';
 
 const { Client, LocalAuth } = pkg;
-const API_PORT = 3001;
 
 class WhatsAppServer {
   constructor() {
@@ -15,7 +14,21 @@ class WhatsAppServer {
 
   async initializeWhatsApp() {
     try {
-      console.error('🚀 Conectando ao WhatsApp Web autenticado...');
+      console.log('🚀 Conectando ao WhatsApp Web autenticado...');
+      
+      const sessionPath = '/home/user/studio/whatsapp-mcp/whatsapp-session';
+      const singletonLockPath = `${sessionPath}/session/SingletonLock`;
+
+      try {
+        await fs.access(singletonLockPath);
+        console.log('⚠️ SingletonLock detectado. Removendo sessão antiga para evitar conflitos...');
+        await fs.rm(sessionPath, { recursive: true, force: true });
+        console.log('✅ Sessão antiga removida com sucesso.');
+      } catch (error) {
+        if (error.code !== 'ENOENT') { // ENOENT means file/directory does not exist, which is fine
+          console.error('Erro ao verificar/remover SingletonLock:', error);
+        }
+      }
       
       this.whatsappClient = new Client({
         authStrategy: new LocalAuth({
@@ -44,8 +57,7 @@ class WhatsAppServer {
             '--max_old_space_size=1024',
             '--headless=new',
             '--disable-blink-features=AutomationControlled',
-            '--disable-features=VizDisplayCompositor',
-            '--single-process'
+            '--disable-features=VizDisplayCompositor'
           ],
           headless: true,
           timeout: 180000,
@@ -59,18 +71,18 @@ class WhatsAppServer {
       });
 
       this.whatsappClient.on('qr', (qr) => {
-        console.error('QR Code recebido. Exibindo no terminal:');
+        console.log('QR Code recebido. Exibindo no terminal:');
         qrcodeTerminal.generate(qr, { small: true });
-        console.error('Escaneie o QR Code acima com o WhatsApp do seu celular.');
+        console.log('Escaneie o QR Code acima com o WhatsApp do seu celular.');
       });
 
       this.whatsappClient.on('ready', () => {
-        console.error('✅ WhatsApp conectado! Servidor de API pronto.');
+        console.log('✅ WhatsApp conectado! Servidor de API pronto.');
         this.isReady = true;
       });
 
       this.whatsappClient.on('authenticated', () => {
-        console.error('🔑 WhatsApp autenticado - usando sessão existente');
+        console.log('🔑 WhatsApp autenticado - usando sessão existente');
       });
 
       this.whatsappClient.on('disconnected', (reason) => {
@@ -181,12 +193,16 @@ const snakeToCamel = (str) => str.toLowerCase().replace(/([-_][a-z])/g, group =>
     .replace('_', '')
 );
 
+function sendJsonResponse(response) {
+    process.stdout.write(JSON.stringify(response) + '\n');
+}
+
 rl.on('line', async (line) => {
     let request;
     try {
         request = JSON.parse(line);
     } catch (e) {
-        process.stdout.write(JSON.stringify({ jsonrpc: '2.0', error: { code: -32700, message: 'Parse error' }, id: null }) + '\n');
+        sendJsonResponse({ jsonrpc: '2.0', error: { code: -32700, message: 'Parse error' }, id: null });
         return;
     }
 
@@ -195,6 +211,13 @@ rl.on('line', async (line) => {
 
     if (method === 'initialize') {
         result = { success: true, message: "Inicialização já concluída ou em progresso." };
+    } else if (method === 'shutdown') {
+        console.log('Recebido comando de shutdown. Encerrando WhatsAppClient...');
+        if (server.whatsappClient) {
+            await server.whatsappClient.destroy();
+        }
+        result = { success: true, message: 'WhatsAppClient encerrado.' };
+        process.exit(0);
     } else if (method === 'tools/call') {
         const { name, arguments: args } = params;
         
@@ -224,6 +247,13 @@ rl.on('line', async (line) => {
         response.result = result;
     }
 
-    process.stdout.write(JSON.stringify(response) + '\n');
+    sendJsonResponse(response);
+});
+
+process.on('SIGINT', async () => {
+    console.log('Encerrando WhatsAppClient...');
+    if (server.whatsappClient) {
+        await server.whatsappClient.destroy();
+    }
 });
 

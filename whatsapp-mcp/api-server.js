@@ -52,7 +52,7 @@ function sendMcpRequest(method, params = {}) {
         reject(new Error('A requisição para o MCP expirou.'));
         pendingRequests.delete(id);
       }
-    }, 15000); // 15 seconds timeout
+    }, 30000); // 30 seconds timeout
   });
 }
 
@@ -68,44 +68,48 @@ app.get('/status', (req, res) => {
   if (mcpProcess.exitCode === null) {
      res.status(200).json({ status: 'ok', message: 'API server is running and MCP process is alive.' });
   } else {
-     res.status(500).json({ status: 'error', message: `MCP process has terminated with code ${mcpProcess.exitCode}.` });
+     res.status(500).json({ status: 'error', message: `MCP process has terminated with code ${mcpProcess.exitCode}. Please check logs or restart the server.` });
   }
 });
 
 // Get all contacts
-app.get('/contacts', async (req, res) => {
-  try {
-    const result = await sendMcpRequest('tools/call', { name: 'get_contacts_real', arguments: {} });
-    res.status(200).json(result);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+// Helper to wrap async functions and catch errors
+const asyncHandler = fn => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
+function callMcpTool(toolName, args = {}) {
+  return sendMcpRequest('tools/call', { name: toolName, arguments: args });
+}
+
+// Get all contacts
+app.get('/contacts', asyncHandler(async (req, res) => {
+  const result = await callMcpTool('get_contacts_real');
+  res.status(200).json(result);
+}));
 
 // Get messages from a specific chat
-app.get('/messages/:chatId', async (req, res) => {
-    try {
-        const { chatId } = req.params;
-        const limit = req.query.limit ? parseInt(req.query.limit) : 20;
-        const result = await sendMcpRequest('tools/call', { name: 'get_messages_real', arguments: { chatId, limit } });
-        res.status(200).json(result);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
+app.get('/messages/:chatId', asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const limit = req.query.limit ? parseInt(req.query.limit) : 20;
+  const result = await callMcpTool('get_messages_real', { chatId, limit });
+  res.status(200).json(result);
+}));
 
 // Send a message
-app.post('/send', async (req, res) => {
-  try {
-    const { phone, message } = req.body;
-    if (!phone || !message) {
-      return res.status(400).json({ error: 'Os campos \'phone\' e \'message\' são obrigatórios.' });
-    }
-    const result = await sendMcpRequest('tools/call', { name: 'send_message_real', arguments: { phone, message } });
-    res.status(200).json(result);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+app.post('/send', asyncHandler(async (req, res) => {
+  const { phone, message } = req.body;
+  if (!phone || !message) {
+    return res.status(400).json({ error: 'Os campos \'phone\' e \'message\' são obrigatórios.' });
   }
+  const result = await callMcpTool('send_message_real', { phone, message });
+  res.status(200).json(result);
+}));
+
+// Centralized error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Erro na API:', err);
+  res.status(500).json({ error: err.message || 'Erro interno do servidor.' });
 });
 
 // --- 5. Start the server ---
@@ -118,8 +122,20 @@ app.listen(port, () => {
     .catch(err => console.error('Erro ao inicializar MCP:', err));
 });
 
-process.on('SIGINT', () => process.exit());
-process.on('exit', () => {
-    console.log('Encerrando processo MCP...');
-    mcpProcess.kill();
-});
+const shutdown = async () => {
+    console.log('Iniciando encerramento gracioso...');
+    try {
+        await sendMcpRequest('shutdown');
+        console.log('Processo MCP encerrado com sucesso.');
+    } catch (error) {
+        console.error('Erro ao encerrar processo MCP:', error);
+        mcpProcess.kill('SIGTERM');
+    } finally {
+        process.exit(0); // Exit after attempting graceful shutdown
+    }
+};
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+
+

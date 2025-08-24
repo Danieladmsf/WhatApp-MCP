@@ -23,6 +23,8 @@ O servidor estará rodando em `http://localhost:3001`.
 
 Na primeira inicialização, pode ser necessário escanear um QR Code que aparecerá no terminal para autenticar sua sessão do WhatsApp.
 
+Para encerrar o servidor de forma limpa, utilize `Ctrl+C` no terminal. Isso garantirá que a sessão do WhatsApp seja desconectada corretamente.
+
 ## Endpoints da API
 
 A base da URL para todas as chamadas é `http://localhost:3001`.
@@ -41,6 +43,14 @@ cURL http://localhost:3001/status
 {
   "status": "ok",
   "message": "API server is running and MCP process is alive."
+}
+```
+
+**Resposta de Erro (Exemplo - Processo MCP encerrado):**
+```json
+{
+  "status": "error",
+  "message": "MCP process has terminated with code [código]. Please check logs or restart the server."
 }
 ```
 
