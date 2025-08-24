@@ -1,143 +1,123 @@
-# Servidor MCP para Integração com WhatsApp
+# Servidor de API do WhatsApp
 
-Este projeto fornece um servidor Model Context Protocol (MCP) para integrar funcionalidades do WhatsApp com sistemas de IA ou outras aplicações. Ele permite enviar mensagens, obter contatos, chats e mensagens, e verificar o status da conexão do WhatsApp.
+Este projeto fornece uma API HTTP RESTful para interagir com o WhatsApp. Ele funciona como uma ponte, traduzindo chamadas de API para comandos que controlam uma sessão do WhatsApp Web em segundo plano.
 
-## Funcionalidades
+## Arquitetura
 
-*   **`send_message_real`**: Envia mensagens de texto para contatos ou grupos.
-*   **`get_contacts_real`**: Obtém a lista de contatos do WhatsApp.
-*   **`get_chats_real`**: Obtém a lista de conversas (chats) do WhatsApp.
-*   **`get_messages_real`**: Obtém mensagens de uma conversa específica.
-*   **`whatsapp_status_real`**: Verifica o status da conexão do WhatsApp.
+- **`api-server.js`**: O ponto de entrada principal. É um servidor [Express.js](https://expressjs.com/) que expõe a API RESTful.
+- **`server-real.js`**: O processo núcleo que gerencia a comunicação com a biblioteca `whatsapp-web.js`. Ele é iniciado e gerenciado automaticamente pelo `api-server.js`.
 
-## Como Iniciar (Para o Usuário)
+## Instalação e Inicialização
 
-Siga estes passos para colocar o servidor em funcionamento:
-
-### 1. Pré-requisitos
-
-Certifique-se de ter o [Node.js](https://nodejs.org/) (versão 18 ou superior) e o `npm` (gerenciador de pacotes do Node.js) instalados em seu sistema.
-
-### 2. Instalação das Dependências
-
-Navegue até o diretório `whatsapp-mcp` e instale as dependências do projeto:
+Abra um terminal, navegue até este diretório e execute:
 
 ```bash
-cd /home/user/studio/whatsapp-mcp
+# 1. Instalar dependências (apenas na primeira vez)
 npm install
+
+# 2. Iniciar o servidor da API
+npm start
 ```
 
-### 3. Iniciando o Servidor
+O servidor estará rodando em `http://localhost:3001`.
 
-O projeto utiliza um servidor de API de teste (`api-test-client.js`) que gerencia o servidor principal do WhatsApp (`server-real.js`). Este é o único script que você precisa iniciar.
+Na primeira inicialização, pode ser necessário escanear um QR Code que aparecerá no terminal para autenticar sua sessão do WhatsApp.
 
-Abra um **único terminal** e execute:
+## Endpoints da API
 
+A base da URL para todas as chamadas é `http://localhost:3001`.
+
+### `GET /status`
+
+Verifica a saúde do servidor da API e do processo de conexão com o WhatsApp.
+
+**Exemplo de Requisição:**
 ```bash
-node /home/user/studio/whatsapp-mcp/api-test-client.js
+cURL http://localhost:3001/status
 ```
 
-Deixe este terminal aberto e rodando.
+**Resposta de Sucesso:**
+```json
+{
+  "status": "ok",
+  "message": "API server is running and MCP process is alive."
+}
+```
 
-### 4. Autenticação do WhatsApp (Primeira Vez ou Sessão Expirada)
+---
 
-Na primeira vez que você iniciar o servidor, ou se sua sessão do WhatsApp expirar, você precisará autenticar:
 
-*   O terminal exibirá a mensagem: `✅ Imagem do QR Code salva em ./whatsapp-mcp/qrcode.png`.
-*   **Abra o arquivo `qrcode.png`** localizado no diretório `whatsapp-mcp` (por exemplo, `/home/user/studio/whatsapp-mcp/qrcode.png`) usando um visualizador de imagens.
-*   **Escaneie o QR Code** exibido na imagem com o aplicativo do WhatsApp no seu celular (Vá em `Configurações` > `Aparelhos Conectados` > `Conectar um aparelho`).
-*   Após escanear, o terminal exibirá `✅ Conexão com WhatsApp estabelecida e pronta para uso!`.
+### `GET /contacts`
 
-## Como uma IA (ou Cliente) Pode se Conectar
+Retorna a lista completa de contatos do WhatsApp.
 
-Uma vez que o servidor esteja rodando e conectado ao WhatsApp (conforme o passo 4 acima), qualquer sistema de IA ou cliente pode interagir com ele através de uma API HTTP simples.
+**Exemplo de Requisição:**
+```bash
+cURL http://localhost:3001/contacts
+```
 
-### Base URL
-
-Todas as requisições devem ser feitas para: `http://localhost:3001`
-
-### Endpoints da API
-
-#### 1. Verificar Status da Conexão
-
-*   **Endpoint:** `/status`
-*   **Método:** `GET`
-*   **Descrição:** Verifica se o servidor está conectado ao WhatsApp e pronto para receber comandos.
-*   **Exemplo de Requisição (cURL):**
-    ```bash
-    curl http://localhost:3001/status
-    ```
-*   **Exemplo de Resposta (Sucesso):**
-    ```json
+**Resposta de Sucesso (Exemplo):**
+```json
+[
     {
-      "status": "pronto",
-      "message": "Conectado ao WhatsApp."
+        "id": "5511999999999@c.us",
+        "name": "Nome do Contato",
+        "number": "5511999999999",
+        "isBlocked": false
     }
-    ```
-*   **Exemplo de Resposta (Servidor não pronto):**
-    ```json
+]
+```
+
+---
+
+
+### `GET /messages/:chatId`
+
+Retorna as mensagens de uma conversa específica. O ID do chat (`chatId`) geralmente é o número do contato no formato `NUMERO@c.us`.
+
+**Parâmetros da Query:**
+- `limit` (opcional): Número de mensagens para retornar. O padrão é 20.
+
+**Exemplo de Requisição (para as últimas 5 mensagens):**
+```bash
+cURL "http://localhost:3001/messages/5511999999999@c.us?limit=5"
+```
+
+**Resposta de Sucesso (Exemplo):**
+```json
+[
     {
-      "status": "ocupado",
-      "message": "Aguardando conexão com o WhatsApp. Tente novamente em alguns segundos."
+        "id": "true_5511999999999@c.us_3EB0...",
+        "body": "Olá, esta é a última mensagem",
+        "fromMe": true,
+        "timestamp": 1678886400
     }
-    ```
+]
+```
 
-#### 2. Obter Contatos
+---
 
-*   **Endpoint:** `/contatos`
-*   **Método:** `GET`
-*   **Descrição:** Retorna uma lista dos contatos do WhatsApp.
-*   **Exemplo de Requisição (cURL):**
-    ```bash
-    curl http://localhost:3001/contatos
-    ```
-*   **Exemplo de Resposta (Sucesso):**
-    ```json
-    [
-      {
-        "type": "text",
-        "text": "📞 CONTATOS REAIS do seu WhatsApp (20):\n\n• Nome do Contato 1\n  📱 5511999999999@c.us\n  ✅ Ativo\n\n..."
-      }
-    ]
-    ```
-    *   A resposta é um array de objetos de conteúdo. O texto com os contatos estará dentro de `content[0].text`.
 
-#### 3. Enviar Mensagem
+### `POST /send`
 
-*   **Endpoint:** `/enviar`
-*   **Método:** `POST`
-*   **Descrição:** Envia uma mensagem de texto para um contato ou grupo.
-*   **Corpo da Requisição (JSON):**
-    ```json
-    {
-      "phone": "NUMERO_DO_CONTATO@c.us",
-      "message": "SUA MENSAGEM"
-    }
-    ```
-    *   `phone`: O número de telefone do destinatário no formato `DDDNUMERO@c.us` (para contatos) ou `ID_DO_GRUPO@g.us` (para grupos).
-    *   `message`: O texto da mensagem a ser enviada.
-*   **Exemplo de Requisição (cURL):**
-    ```bash
-    curl -X POST -H "Content-Type: application/json" -d '{"phone":"5511999999999@c.us","message":"Olá, este é um teste!"}' http://localhost:3001/enviar
-    ```
-*   **Exemplo de Resposta (Sucesso):**
-    ```json
-    [
-      {
-        "type": "text",
-        "text": "✅ Mensagem real enviada para 5511999999999@c.us: Olá, este é um teste!"
-      }
-    ]
-    ```
-*   **Exemplo de Resposta (Erro):**
-    ```json
-    {
-      "error": "Erro ao enviar mensagem real: [Detalhes do Erro]"
-    }
-    ```
+Envia uma nova mensagem de texto.
 
-## Observações Importantes
+**Corpo da Requisição (JSON):**
+```json
+{
+  "phone": "5511999999999@c.us",
+  "message": "Olá do servidor da API!"
+}
+```
 
-*   **Sessão do WhatsApp:** O servidor mantém uma sessão persistente na pasta `whatsapp-session`. Se esta pasta for excluída ou a sessão for invalidada (ex: conectar o WhatsApp em outro lugar), um novo QR Code será gerado na próxima inicialização.
-*   **Chromium Headless:** O `whatsapp-web.js` utiliza o Chromium em modo headless. Certifique-se de que seu ambiente tenha os recursos necessários para executá-lo.
-*   **Logs:** O terminal onde o `api-test-client.js` está rodando exibirá logs detalhados do servidor MCP e do WhatsApp, úteis para depuração.
+**Exemplo de Requisição:**
+```bash
+curl -X POST -H "Content-Type: application/json" \
+     -d '{"phone":"5511999999999@c.us","message":"Olá do servidor da API!"}' \
+     http://localhost:3001/send
+```
+
+**Resposta de Sucesso:**
+Retorna o objeto da mensagem enviada, confirmando o envio.
+
+```json
